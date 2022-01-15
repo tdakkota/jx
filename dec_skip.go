@@ -73,16 +73,41 @@ func (d *Decoder) Bool() (bool, error) {
 
 // Skip skips a json object and positions to relatively the next json object.
 func (d *Decoder) Skip() error {
+	var (
+		stack       = make([]byte, 0, 128)
+		unwindParam byte
+	)
+
+	push := func(c byte) error {
+		if err := d.incDepth(); err != nil {
+			return err
+		}
+		stack = append(stack, c)
+		return nil
+	}
+	pop := func(c byte) error {
+		if len(stack) < 1 {
+			return badToken(c)
+		}
+		last := stack[len(stack)-1]
+		if last != c {
+			return badToken(c)
+		}
+		stack = stack[:len(stack)-1]
+		return d.decDepth()
+	}
+
 	c, err := d.next()
 	if err != nil {
 		return err
 	}
 	switch c {
+	case '[':
+		goto skipArray
+	case '{':
+		goto skipObject
 	case '"':
-		if err := d.skipStr(); err != nil {
-			return errors.Wrap(err, "str")
-		}
-		return nil
+		return d.skipStr()
 	case 'n':
 		d.unread()
 		return d.Null()
@@ -93,19 +118,161 @@ func (d *Decoder) Skip() error {
 	case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 		d.unread()
 		return d.skipNumber()
-	case '[':
-		if err := d.skipArr(); err != nil {
-			return errors.Wrap(err, "array")
-		}
-		return nil
-	case '{':
-		if err := d.skipObj(); err != nil {
-			return errors.Wrap(err, "object")
-		}
-		return nil
 	default:
 		return badToken(c)
 	}
+
+skipObject:
+	if err := push('{'); err != nil {
+		return err
+	}
+	c, err = d.more()
+	if err != nil {
+		return errors.Wrap(err, "next")
+	}
+	switch c {
+	case '}':
+		unwindParam = c
+		goto unwind
+	case '"':
+		d.unread()
+	default:
+		return badToken(c)
+	}
+
+readObject:
+	if err := d.consume('"'); err != nil {
+		return err
+	}
+	if err := d.skipStr(); err != nil {
+		return errors.Wrap(err, "read field name")
+	}
+	if err := d.consume(':'); err != nil {
+		return errors.Wrap(err, "field")
+	}
+	{
+		c, err := d.next()
+		if err != nil {
+			return err
+		}
+		switch c {
+		case '[':
+			goto skipArray
+		case '{':
+			goto skipObject
+		case '"':
+			if err := d.skipStr(); err != nil {
+				return errors.Wrap(err, "str")
+			}
+		case 'n':
+			d.unread()
+			if err := d.Null(); err != nil {
+				return errors.Wrap(err, "null")
+			}
+		case 't', 'f':
+			d.unread()
+			if _, err := d.Bool(); err != nil {
+				return errors.Wrap(err, "bool")
+			}
+		case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			d.unread()
+			if err := d.skipNumber(); err != nil {
+				return errors.Wrap(err, "number")
+			}
+		default:
+			return badToken(c)
+		}
+	}
+unwindObject:
+	c, err = d.more()
+	if err != nil {
+		return errors.Wrap(err, "read comma")
+	}
+	switch c {
+	case ',':
+	case '}':
+		unwindParam = c
+		goto unwind
+	default:
+		return badToken(c)
+	}
+	goto readObject
+
+skipArray:
+	if err := push('['); err != nil {
+		return err
+	}
+	c, err = d.more()
+	if err != nil {
+		return errors.Wrap(err, "next")
+	}
+	if c == ']' {
+		unwindParam = c
+		goto unwind
+	}
+	d.unread()
+readArray:
+	{
+		c, err := d.next()
+		if err != nil {
+			return err
+		}
+		switch c {
+		case '[':
+			goto skipArray
+		case '{':
+			goto skipObject
+		case '"':
+			if err := d.skipStr(); err != nil {
+				return errors.Wrap(err, "str")
+			}
+		case 'n':
+			d.unread()
+			if err := d.Null(); err != nil {
+				return errors.Wrap(err, "null")
+			}
+		case 't', 'f':
+			d.unread()
+			if _, err := d.Bool(); err != nil {
+				return errors.Wrap(err, "bool")
+			}
+		case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			d.unread()
+			if err := d.skipNumber(); err != nil {
+				return errors.Wrap(err, "number")
+			}
+		default:
+			return badToken(c)
+		}
+	}
+unwindArray:
+	c, err = d.more()
+	if err != nil {
+		return errors.Wrap(err, "read comma")
+	}
+	switch c {
+	case ',':
+	case ']':
+		unwindParam = c
+		goto unwind
+	default:
+		return badToken(c)
+	}
+	goto readArray
+
+unwind:
+	if err := pop(unwindParam - 2); err != nil {
+		return err
+	}
+	if len(stack) > 0 {
+		switch stack[len(stack)-1] {
+		case '{':
+			goto unwindObject
+		case '[':
+			goto unwindArray
+		}
+	}
+	return nil
 }
 
 var (
