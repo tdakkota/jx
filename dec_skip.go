@@ -26,8 +26,7 @@ func (d *Decoder) Skip() error {
 		_, err := d.Bool()
 		return err
 	case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
-		d.unread()
-		return d.skipNumber()
+		return d.skipNumber(c)
 	case '[':
 		if err := d.skipArr(); err != nil {
 			return errors.Wrap(err, "array")
@@ -69,13 +68,11 @@ var (
 // skipNumber reads one JSON number.
 //
 // Assumes d.buf is not empty.
-func (d *Decoder) skipNumber() error {
+func (d *Decoder) skipNumber(c byte) error {
 	const (
 		digitTag  byte = 1
 		closerTag byte = 2
 	)
-	c := d.buf[d.head]
-	d.head++
 	switch c {
 	case '-':
 		c, err := d.byte()
