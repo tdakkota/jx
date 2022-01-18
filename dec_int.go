@@ -8,13 +8,12 @@ import (
 	"github.com/go-faster/errors"
 )
 
-var intDigits []int8
+var intDigits [256]int8
 
 const uint32SafeToMultiply10 = uint32(0xffffffff)/10 - 1
 const uint64SafeToMultiple10 = uint64(0xffffffffffffffff)/10 - 1
 
 func init() {
-	intDigits = make([]int8, 256)
 	for i := 0; i < len(intDigits); i++ {
 		intDigits[i] = invalidCharForNumber
 	}
@@ -95,54 +94,55 @@ func (d *Decoder) readUInt32() (uint32, error) {
 	if ind == invalidCharForNumber {
 		return 0, errors.Wrap(err, "bad token")
 	}
+
 	value := uint32(ind)
-	if d.tail-d.head > 10 {
-		i := d.head
-		ind2 := intDigits[d.buf[i]]
+	if buf := d.buf[d.head:d.tail]; len(buf) > 10 {
+		i := 0
+		ind2 := intDigits[buf[i]]
 		if ind2 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value, nil
 		}
 		i++
-		ind3 := intDigits[d.buf[i]]
+		ind3 := intDigits[buf[i]]
 		if ind3 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value*10 + uint32(ind2), nil
 		}
 		i++
-		ind4 := intDigits[d.buf[i]]
+		ind4 := intDigits[buf[i]]
 		if ind4 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value*100 + uint32(ind2)*10 + uint32(ind3), nil
 		}
 		i++
-		ind5 := intDigits[d.buf[i]]
+		ind5 := intDigits[buf[i]]
 		if ind5 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value*1000 + uint32(ind2)*100 + uint32(ind3)*10 + uint32(ind4), nil
 		}
 		i++
-		ind6 := intDigits[d.buf[i]]
+		ind6 := intDigits[buf[i]]
 		if ind6 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value*10000 + uint32(ind2)*1000 + uint32(ind3)*100 + uint32(ind4)*10 + uint32(ind5), nil
 		}
 		i++
-		ind7 := intDigits[d.buf[i]]
+		ind7 := intDigits[buf[i]]
 		if ind7 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value*100000 + uint32(ind2)*10000 + uint32(ind3)*1000 + uint32(ind4)*100 + uint32(ind5)*10 + uint32(ind6), nil
 		}
 		i++
-		ind8 := intDigits[d.buf[i]]
+		ind8 := intDigits[buf[i]]
 		if ind8 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value*1000000 + uint32(ind2)*100000 + uint32(ind3)*10000 + uint32(ind4)*1000 + uint32(ind5)*100 + uint32(ind6)*10 + uint32(ind7), nil
 		}
 		i++
-		ind9 := intDigits[d.buf[i]]
+		ind9 := intDigits[buf[i]]
 		value = value*10000000 + uint32(ind2)*1000000 + uint32(ind3)*100000 + uint32(ind4)*10000 + uint32(ind5)*1000 + uint32(ind6)*100 + uint32(ind7)*10 + uint32(ind8)
-		d.head = i
+		d.head += i
 		if ind9 == invalidCharForNumber {
 			return value, nil
 		}
@@ -223,53 +223,53 @@ func (d *Decoder) readUInt64(c byte) (uint64, error) {
 		return 0, errors.Wrap(badToken(c), "invalid number")
 	}
 	value := uint64(ind)
-	if d.tail-d.head > 10 {
-		i := d.head
-		ind2 := intDigits[d.buf[i]]
+	if buf := d.buf[d.head:d.tail]; len(buf) > 10 {
+		i := 0
+		ind2 := intDigits[buf[i]]
 		if ind2 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value, nil
 		}
 		i++
-		ind3 := intDigits[d.buf[i]]
+		ind3 := intDigits[buf[i]]
 		if ind3 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value*10 + uint64(ind2), nil
 		}
 		i++
-		ind4 := intDigits[d.buf[i]]
+		ind4 := intDigits[buf[i]]
 		if ind4 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value*100 + uint64(ind2)*10 + uint64(ind3), nil
 		}
 		i++
-		ind5 := intDigits[d.buf[i]]
+		ind5 := intDigits[buf[i]]
 		if ind5 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value*1000 + uint64(ind2)*100 + uint64(ind3)*10 + uint64(ind4), nil
 		}
 		i++
-		ind6 := intDigits[d.buf[i]]
+		ind6 := intDigits[buf[i]]
 		if ind6 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value*10000 + uint64(ind2)*1000 + uint64(ind3)*100 + uint64(ind4)*10 + uint64(ind5), nil
 		}
 		i++
-		ind7 := intDigits[d.buf[i]]
+		ind7 := intDigits[buf[i]]
 		if ind7 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value*100000 + uint64(ind2)*10000 + uint64(ind3)*1000 + uint64(ind4)*100 + uint64(ind5)*10 + uint64(ind6), nil
 		}
 		i++
-		ind8 := intDigits[d.buf[i]]
+		ind8 := intDigits[buf[i]]
 		if ind8 == invalidCharForNumber {
-			d.head = i
+			d.head += i
 			return value*1000000 + uint64(ind2)*100000 + uint64(ind3)*10000 + uint64(ind4)*1000 + uint64(ind5)*100 + uint64(ind6)*10 + uint64(ind7), nil
 		}
 		i++
-		ind9 := intDigits[d.buf[i]]
+		ind9 := intDigits[buf[i]]
 		value = value*10000000 + uint64(ind2)*1000000 + uint64(ind3)*100000 + uint64(ind4)*10000 + uint64(ind5)*1000 + uint64(ind6)*100 + uint64(ind7)*10 + uint64(ind8)
-		d.head = i
+		d.head += i
 		if ind9 == invalidCharForNumber {
 			return value, nil
 		}
