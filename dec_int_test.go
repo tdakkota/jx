@@ -1,6 +1,8 @@
 package jx
 
 import (
+	"math"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -17,7 +19,7 @@ func BenchmarkDecoder_Int(b *testing.B) {
 	}
 }
 
-func BenchmarkDecoder_Uint(b *testing.B) {
+func BenchmarkDecoder_UInt(b *testing.B) {
 	data := []byte(`69315063`)
 	d := GetDecoder()
 	for i := 0; i < b.N; i++ {
@@ -28,25 +30,37 @@ func BenchmarkDecoder_Uint(b *testing.B) {
 	}
 }
 
-func TestDecoder_int_sizes(t *testing.T) {
-	data := []byte(`69315063`)
-	d := GetDecoder()
-	for _, size := range []int{32, 64} {
-		d.ResetBytes(data)
-		v, err := d.int(size)
-		require.NoError(t, err)
-		require.Equal(t, 69315063, v)
+func TestDecoderInt(t *testing.T) {
+	type testCase struct {
+		input string
+		value int
 	}
-}
+	inputs := []testCase{
+		{`0`, 0},
+		{`69315063`, 69315063},
+	}
+	for i := 1; i < math.MaxInt32; i *= 10 {
+		inputs = append(inputs, testCase{
+			input: strconv.Itoa(i),
+			value: i,
+		})
+	}
 
-func TestDecoder_uint_sizes(t *testing.T) {
-	data := []byte(`69315063`)
 	d := GetDecoder()
-	for _, size := range []int{32, 64} {
-		d.ResetBytes(data)
-		v, err := d.uint(size)
-		require.NoError(t, err)
-		require.Equal(t, uint(69315063), v)
+	for _, tt := range inputs {
+		t.Run(tt.input, func(t *testing.T) {
+			for _, size := range []int{32, 64} {
+				d.ResetBytes([]byte(tt.input))
+				v, err := d.uint(size)
+				require.NoError(t, err)
+				require.Equal(t, uint(tt.value), v)
+
+				d.ResetBytes([]byte(tt.input))
+				v2, err := d.int(size)
+				require.NoError(t, err)
+				require.Equal(t, int(tt.value), v2)
+			}
+		})
 	}
 }
 
