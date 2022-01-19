@@ -374,46 +374,67 @@ readTok:
 // skipObj reads JSON object.
 //
 // Assumes first bracket was consumed.
-func (d *Decoder) skipObj() error {
+func (d *Decoder) skipObj() (err error) {
 	if err := d.incDepth(); err != nil {
 		return errors.Wrap(err, "inc")
 	}
 
-	c, err := d.more()
-	if err != nil {
-		return errors.Wrap(err, "next")
+	var c byte
+	if buf := d.buf[d.head:d.tail]; len(buf) > 0 && spaceSet[buf[0]] == 0 {
+		c = buf[0]
+		d.head++
+	} else {
+		c, err = d.more()
+		if err != nil {
+			return errors.Wrap(err, "next")
+		}
 	}
 	switch c {
 	case '}':
-		return d.decDepth()
+		d.depth--
+		return nil
 	case '"':
-		d.unread()
+		d.head--
 	default:
 		return badToken(c)
 	}
 
 	for {
-		if err := d.consume('"'); err != nil {
-			return err
+		if buf := d.buf[d.head:d.tail]; len(buf) > 0 && buf[0] == '"' {
+			d.head++
+		} else {
+			if err := d.consume('"'); err != nil {
+				return errors.Wrap(err, "field")
+			}
 		}
 		if err := d.skipStr(); err != nil {
 			return errors.Wrap(err, "read field name")
 		}
-		if err := d.consume(':'); err != nil {
-			return errors.Wrap(err, "field")
+		if buf := d.buf[d.head:d.tail]; len(buf) > 0 && buf[0] == ':' {
+			d.head++
+		} else {
+			if err := d.consume(':'); err != nil {
+				return errors.Wrap(err, "field")
+			}
 		}
 		if err := d.Skip(); err != nil {
 			return err
 		}
-		c, err := d.more()
-		if err != nil {
-			return errors.Wrap(err, "read comma")
+		if buf := d.buf[d.head:d.tail]; len(buf) > 0 && spaceSet[buf[0]] == 0 {
+			c = buf[0]
+			d.head++
+		} else {
+			c, err = d.more()
+			if err != nil {
+				return errors.Wrap(err, "next")
+			}
 		}
 		switch c {
 		case ',':
 			continue
 		case '}':
-			return d.decDepth()
+			d.depth--
+			return nil
 		default:
 			return badToken(c)
 		}
