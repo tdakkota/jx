@@ -69,7 +69,7 @@ func TestDecoder_skipNumber(t *testing.T) {
 			sr.Reset(tt)
 			d := Decode(io.MultiReader(sr, er), len(tt))
 			require.NoError(t, d.read())
-			require.Error(t, d.skipNumber())
+			require.Error(t, d.skipNumber(tt[0]))
 		})
 	}
 }
