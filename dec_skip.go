@@ -2,6 +2,7 @@ package jx
 
 import (
 	"io"
+	"math/bits"
 
 	"github.com/go-faster/errors"
 )
@@ -263,10 +264,58 @@ var (
 	}
 )
 
+// See https://graphics.stanford.edu/~seander/bithacks.html#ZeroInWord.
+func hasZeroByte64(v uint64) bool {
+	return ((v - 0x0101010101010101) & ^(v) & 0x8080808080808080) != 0
+}
+
+// See Hacker's-Delight, 6-1 Find First 0-Byte.
+func zeroByteIdx64(x uint64) (n int) {
+	x = bits.ReverseBytes64(x)
+	var y uint64
+	// Original byte: 00 80 other
+	y = (x & 0x7F7F7F7F7F7F7F7F) + 0x7F7F7F7F7F7F7F7F // 7F 7F 1xxxxxxx
+	y = ^(y | x | 0x7F7F7F7F7F7F7F7F)                 // 80 00 00000000
+	n = bits.LeadingZeros64(y) >> 3                   // n = 0 ... 4, 4 if x
+	return n                                          // has no 0-byte.
+}
+
 // skipStr reads one JSON string.
 //
 // Assumes first quote was consumed.
 func (d *Decoder) skipStr() error {
+	const (
+		controlCharacterMaskByte = ^byte(' ' - 1)
+		controlCharacterMask     = uint64(controlCharacterMaskByte) |
+			uint64(controlCharacterMaskByte)<<8 |
+			uint64(controlCharacterMaskByte)<<16 |
+			uint64(controlCharacterMaskByte)<<24 |
+			uint64(controlCharacterMaskByte)<<32 |
+			uint64(controlCharacterMaskByte)<<40 |
+			uint64(controlCharacterMaskByte)<<48 |
+			uint64(controlCharacterMaskByte)<<56
+
+		slashMaskByte = '\\'
+		slashMask     = uint64(slashMaskByte) |
+			uint64(slashMaskByte)<<8 |
+			uint64(slashMaskByte)<<16 |
+			uint64(slashMaskByte)<<24 |
+			uint64(slashMaskByte)<<32 |
+			uint64(slashMaskByte)<<40 |
+			uint64(slashMaskByte)<<48 |
+			uint64(slashMaskByte)<<56
+
+		quoteMaskByte = '"'
+		quoteMask     = uint64(quoteMaskByte) |
+			uint64(quoteMaskByte)<<8 |
+			uint64(quoteMaskByte)<<16 |
+			uint64(quoteMaskByte)<<24 |
+			uint64(quoteMaskByte)<<32 |
+			uint64(quoteMaskByte)<<40 |
+			uint64(quoteMaskByte)<<48 |
+			uint64(quoteMaskByte)<<56
+	)
+
 	var (
 		c byte
 		i int
@@ -276,55 +325,36 @@ readStr:
 		i = 0
 		buf := d.buf[d.head:d.tail]
 		for len(buf) >= 8 {
-			c = buf[0]
-			if safeSet[c] != 0 {
-				goto readTok
+			load := uint64(buf[0]) |
+				uint64(buf[1])<<8 |
+				uint64(buf[2])<<16 |
+				uint64(buf[3])<<24 |
+				uint64(buf[4])<<32 |
+				uint64(buf[5])<<40 |
+				uint64(buf[6])<<48 |
+				uint64(buf[7])<<56
+			if slash, quote, cc := load^slashMask,
+				load^quoteMask,
+				load&controlCharacterMask; hasZeroByte64(slash) || hasZeroByte64(quote) || hasZeroByte64(cc) {
+				x := zeroByteIdx64(slash)
+				y := zeroByteIdx64(quote)
+				z := zeroByteIdx64(cc)
+				min := x
+				if y < min {
+					min = y
+				}
+				if z < min {
+					min = z
+				}
+				if min < 8 {
+					c = buf[min]
+					i += min
+					goto readTok
+				}
 			}
-			i++
-
-			c = buf[1]
-			if safeSet[c] != 0 {
-				goto readTok
-			}
-			i++
-
-			c = buf[2]
-			if safeSet[c] != 0 {
-				goto readTok
-			}
-			i++
-
-			c = buf[3]
-			if safeSet[c] != 0 {
-				goto readTok
-			}
-			i++
-
-			c = buf[4]
-			if safeSet[c] != 0 {
-				goto readTok
-			}
-			i++
-
-			c = buf[5]
-			if safeSet[c] != 0 {
-				goto readTok
-			}
-			i++
-
-			c = buf[6]
-			if safeSet[c] != 0 {
-				goto readTok
-			}
-			i++
-
-			c = buf[7]
-			if safeSet[c] != 0 {
-				goto readTok
-			}
-			i++
 
 			buf = buf[8:]
+			i += 8
 		}
 		var n int
 		for n, c = range buf {
