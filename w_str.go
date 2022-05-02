@@ -11,7 +11,7 @@ import (
 // All values are true except for the ASCII control characters (0-31), the
 // double quote ("), the backslash character ("\"), HTML opening and closing
 // tags ("<" and ">"), and the ampersand ("&").
-var htmlSafeSet = [utf8.RuneSelf]bool{
+var htmlSafeSet = [256]bool{
 	' ':      true,
 	'!':      true,
 	'"':      false,
@@ -210,22 +210,6 @@ func strEscapeSlow[T byteseq](w *Writer, i int, v T, valLen int) {
 	w.byte('"')
 }
 
-// safeSet holds the value true if the ASCII character with the given array
-// position can be represented inside a JSON string without any further
-// escaping.
-//
-// All values are true except for the ASCII control characters (0-31), the
-// double quote ("), and the backslash character ("\").
-var safeSet = [256]byte{
-	// First 31 characters.
-	1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1,
-	1, 1, 1, 1, 1, 1, 1, 1,
-	'"':  1,
-	'\\': 1,
-}
-
 // Str encodes string without html escaping.
 //
 // Use StrEscape to escape html, this is default for encoding/json and
@@ -252,7 +236,7 @@ func writeStr[T byteseq](w *Writer, v T) {
 		c      byte
 	)
 	for i, c = range []byte(v) {
-		if safeSet[c] != 0 {
+		if charset[c].is(charEscape) {
 			goto slow
 		}
 	}
@@ -271,7 +255,7 @@ func strSlow[T byteseq](w *Writer, v T) {
 	// for the remaining parts, we process them char by char
 	for i < len(v) {
 		b := v[i]
-		if safeSet[b] == 0 {
+		if !charset[b].is(charEscape) {
 			i++
 			continue
 		}

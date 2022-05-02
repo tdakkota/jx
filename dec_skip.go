@@ -43,37 +43,10 @@ func (d *Decoder) Skip() error {
 	}
 }
 
-var (
-	skipNumberSet = [256]byte{
-		'0': 1,
-		'1': 1,
-		'2': 1,
-		'3': 1,
-		'4': 1,
-		'5': 1,
-		'6': 1,
-		'7': 1,
-		'8': 1,
-		'9': 1,
-
-		',':  2,
-		']':  2,
-		'}':  2,
-		' ':  2,
-		'\t': 2,
-		'\n': 2,
-		'\r': 2,
-	}
-)
-
 // skipNumber reads one JSON number.
 //
 // Assumes d.buf is not empty.
 func (d *Decoder) skipNumber() error {
-	const (
-		digitTag  byte = 1
-		closerTag byte = 2
-	)
 	c := d.buf[d.head]
 	d.head++
 	switch c {
@@ -83,7 +56,7 @@ func (d *Decoder) skipNumber() error {
 			return err
 		}
 		// Character after '-' must be a digit.
-		if skipNumberSet[c] != digitTag {
+		if !charset[c].is(charDigit) {
 			return badToken(c)
 		}
 		if c != '0' {
@@ -104,7 +77,7 @@ func (d *Decoder) skipNumber() error {
 		}
 
 		c = d.buf[d.head]
-		if skipNumberSet[c] == closerTag {
+		if charset[c].is(charNumberEnd) {
 			return nil
 		}
 		switch c {
@@ -118,11 +91,11 @@ func (d *Decoder) skipNumber() error {
 	}
 	for {
 		for i, c := range d.buf[d.head:d.tail] {
-			switch skipNumberSet[c] {
-			case closerTag:
+			switch set := charset[c]; {
+			case set.is(charNumberEnd):
 				d.head += i
 				return nil
-			case digitTag:
+			case set.is(charDigit):
 				continue
 			}
 
@@ -154,15 +127,15 @@ stateDot:
 		var last byte = '.'
 		for {
 			for i, c := range d.buf[d.head:d.tail] {
-				switch skipNumberSet[c] {
-				case closerTag:
+				switch set := charset[c]; {
+				case set.is(charNumberEnd):
 					d.head += i
 					// Check that dot is not last character.
 					if last == '.' {
 						return io.ErrUnexpectedEOF
 					}
 					return nil
-				case digitTag:
+				case set.is(charDigit):
 					last = c
 					continue
 				}
@@ -201,14 +174,14 @@ stateExp:
 		if err != nil {
 			return err
 		}
-		if skipNumberSet[numOrSign] != digitTag { // If next character is not a digit, check for sign.
+		if !charset[numOrSign].is(charDigit) { // If next character is not a digit, check for sign.
 			if numOrSign == '-' || numOrSign == '+' {
 				num, err := d.byte()
 				if err != nil {
 					return err
 				}
 				// There must be a number after sign.
-				if skipNumberSet[num] != digitTag {
+				if !charset[num].is(charDigit) {
 					return badToken(num)
 				}
 			} else {
@@ -218,11 +191,11 @@ stateExp:
 	}
 	for {
 		for i, c := range d.buf[d.head:d.tail] {
-			if skipNumberSet[c] == closerTag {
+			if charset[c].is(charNumberEnd) {
 				d.head += i
 				return nil
 			}
-			if skipNumberSet[c] == 0 {
+			if !charset[c].is(charDigit) {
 				return badToken(c)
 			}
 		}
@@ -277,49 +250,49 @@ readStr:
 		buf := d.buf[d.head:d.tail]
 		for len(buf) >= 8 {
 			c = buf[0]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[1]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[2]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[3]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[4]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[5]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[6]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[7]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
@@ -328,7 +301,7 @@ readStr:
 		}
 		var n int
 		for n, c = range buf {
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				i += n
 				goto readTok
 			}

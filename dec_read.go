@@ -14,22 +14,18 @@ func (d *Decoder) Next() Type {
 	return types[v]
 }
 
-var spaceSet = [256]byte{
-	' ': 1, '\n': 1, '\t': 1, '\r': 1,
-}
-
 func (d *Decoder) consume(c byte) (err error) {
 	for {
 		buf := d.buf[d.head:d.tail]
 		for i, got := range buf {
-			switch spaceSet[got] {
+			switch set := charset[got]; {
 			default:
 				d.head += i + 1
 				if c != got {
 					return badToken(got)
 				}
 				return nil
-			case 1:
+			case set.is(charSpace):
 				continue
 			}
 		}
@@ -56,11 +52,11 @@ func (d *Decoder) next() (byte, error) {
 	for {
 		buf := d.buf[d.head:d.tail]
 		for i, c := range buf {
-			switch spaceSet[c] {
+			switch set := charset[c]; {
 			default:
 				d.head += i + 1
 				return c, nil
-			case 1:
+			case set.is(charSpace):
 				continue
 			}
 		}

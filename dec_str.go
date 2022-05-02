@@ -59,49 +59,49 @@ func (d *Decoder) str(v value) (value, error) {
 		buf := d.buf[d.head:d.tail]
 		for len(buf) >= 8 {
 			c = buf[0]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[1]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[2]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[3]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[4]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[5]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[6]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[7]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
@@ -110,7 +110,7 @@ func (d *Decoder) str(v value) (value, error) {
 		}
 		var n int
 		for n, c = range buf {
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				i += n
 				goto readTok
 			}
@@ -150,49 +150,49 @@ readStr:
 		buf := d.buf[d.head:d.tail]
 		for len(buf) >= 8 {
 			c = buf[0]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[1]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[2]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[3]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[4]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[5]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[6]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
 
 			c = buf[7]
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++
@@ -200,7 +200,7 @@ readStr:
 			buf = buf[8:]
 		}
 		for _, c = range buf {
-			if safeSet[c] != 0 {
+			if charset[c].is(charEscape) {
 				goto readTok
 			}
 			i++

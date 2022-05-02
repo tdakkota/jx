@@ -60,7 +60,7 @@ func TestNullError(t *testing.T) {
 				continue
 			}
 			// Skip space as first character.
-			if i == 0 && spaceSet[c] == 1 {
+			if i == 0 && charset[c].is(charSpace) {
 				continue
 			}
 			b[i] = c
